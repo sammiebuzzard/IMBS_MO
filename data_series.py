@@ -1,5 +1,11 @@
+'''Defines the data series object, a structure for holding a single data 
+time series from a CRREL ice mass balance buoy. Data is held in .data_list, 
+a dictionary in which the keys are Python datetime objects. Data series can 
+be added, subtracted etc.'''
+
 class data_series:
     def __init__(self,buoy_name,file_ext_name,varname):
+        '''Creates a new empty data series object'''
         self.name = buoy_name
 	self.fen = file_ext_name
 	self.label = varname
@@ -8,6 +14,9 @@ class data_series:
 
 
     def __add__(self,other,name=None,label=None):
+        '''Adds two data series objects together, with data points created only
+           at coincident date times. Alternatively, adds
+           a constant to the given data series.'''
         new_series = self.combine(other,name=name,label=label)
 
         ddates1 = self.dates()
@@ -29,6 +38,9 @@ class data_series:
 
 
     def __sub__(self,other,name=None,label=None):
+        '''Subtracts one data series object from another, with data points 
+           created only at coincident date times. Alternatively, subtracts 
+           a constant from the given data series.'''
         new_series = self.combine(other,name=name,label=label)
 
         ddates1 = self.dates()
@@ -50,6 +62,9 @@ class data_series:
 
 
     def __mul__(self,other,name=None,label=None):
+        '''Multiplies two data series objects together, with data points 
+           created only at coincident date times. Alternatively, multiplies
+           the given data series by a constant.'''
         new_series = self.combine(other,name=name,label=label)
 
         ddates1 = self.dates()
@@ -71,6 +86,9 @@ class data_series:
 
 
     def __div__(self,other,name=None,label=None):
+        '''Divides one data series object by another, with data points 
+           created only at coincident date times. Alternatively, divides
+           the given data series by a constant.'''
         new_series = self.combine(other,name=name,label=label)
 
         ddates1 = self.dates()
@@ -92,7 +110,6 @@ class data_series:
     
 	
     def combine(self,other,name=None,label=None):
-
         if isinstance(other,data_series):
             if not label is None:
                 new_label = label
@@ -124,6 +141,7 @@ class data_series:
 
 	
     def read(self,data_file,varname):
+        '''Given an IMB source file, reads the data into a data series object'''
     
         import csv
 	import linekey
@@ -162,7 +180,7 @@ class data_series:
 				if (ew_value == 'W'):
 				    value = 0. - value
 
-                            if key.fliplon and varname=='Longitude':
+                            if key.fliplon and varname=='longitude':
                                 value = 0. - value
 
                             if varname in vscale_vars:
@@ -188,11 +206,16 @@ class data_series:
 	    
     def show(self,show=True,start_date = None, end_date = None,color = None, xlr=None, label=True, ylim = None, 
         estimate_date_list=[],ecolor = '#ff0000'):
+        '''Produces time series plot of a given data series'''
         import matplotlib.pyplot as plt
 	import datetime as dt
 	import numpy as np
         import functions
 	
+        axis = plt.axes()
+	    
+	plt.setp(axis.get_xticklabels(),visible=False)
+
 	dates = self.dates()
 	date_numbers = [functions.datetime_to_float(ddt) for ddt in dates]
 	if not date_numbers:
@@ -209,11 +232,11 @@ class data_series:
 	if not color:
 	    color = '#0000FF'
 	    
-	plt.plot(date_numbers,values,'g+',markersize = 8,markeredgewidth=3,color = color)
+	axis.plot(date_numbers,values,'g+',markersize = 8,markeredgewidth=3,color = color)
 	
 	if len(estimate_date_list) > 0:
 	    values = [self.estimate(ddate) for ddate in estimate_date_list]
-	    plt.plot(estimate_date_list,values,marker='o',markersize=10,markeredgewidth=4,color = ecolor)
+	    axis.plot(estimate_date_list,values,marker='o',markersize=10,markeredgewidth=4,color = ecolor)
 	
 	axis = plt.gca()
 
@@ -230,18 +253,24 @@ class data_series:
 	
 	
     def dates(self):
+        '''Returns ordered list of datetime objects corresponding to times of 
+        observation for a given data series'''
 	ddates = self.data_list.keys()
 	ddates.sort()
         return ddates
 		
 			     
     def values(self):
+        '''Returns list of data values for a given data series. The list is
+        ordered by time of observation'''
 	dates = self.dates()
 	values = [self.data_list[date] for date in dates]
         return values
 	
 	
     def period(self):
+        '''Returns first and last datetime object for a given data series
+        (i.e. period of validity)'''
 	dates = self.data_list.keys()
 	dates.sort()
 
@@ -258,6 +287,9 @@ class data_series:
 	
 	
     def classify(self,date_examine):
+        '''Used in data series regularisation; decides whether a data series 
+        is 'sparse' or 'dense' at any point in time within the period of
+        validity'''
         import numpy as np
     
  	dates = self.data_list.keys()
@@ -311,6 +343,11 @@ class data_series:
     
 
     def estimate(self,date_examine):
+        '''Estimates the value of given data series at any point in time
+           within the period of validity. The estimate is calculated using 
+           either linear interpolation (if the data series is classified as
+           sparse at that point) or binomial mean (if the data series is 
+           classified as dense at that point.'''
     
         if self.classify(date_examine)=='outside':
             result = None
@@ -330,8 +367,12 @@ class data_series:
 	    
 	    
     def estimate_binomial_mean(self,date_examine,radius=1.):
+        '''Estimates the value of given data series at any point in time
+           within the period of validity using binomial mean. The mean is taken
+           over the period centred on date_examine, with length (in days) of
+           radius * 2'''
 
-        sigma = radius * 60. * 60. * 24.
+        sigma = radius * 60. * 60. * 24. * radius
         import functions
  	dates = self.dates()
         if is_datetime(dates[0]):
@@ -368,6 +409,8 @@ class data_series:
 
 
     def estimate_interpolate(self,date_examine):
+        '''Estimates the value of given data series at any point in time
+           (date_examine) within the period of validity using interpolation'''
         import numpy as np
         number_examine = date_examine.toordinal() + date_examine.hour/24. + date_examine.minute/(24.*60.)
     
@@ -430,6 +473,9 @@ class data_series:
 
 
     def regularise(self):
+        '''Produce a modified version of a given data series, with times of
+        observation at regular intervals (midnight daily) using the estimate()
+        method'''
         import os
         import datetime as dt
         if self.type == 'regular':
@@ -460,6 +506,8 @@ class data_series:
 	        		    
 
     def regularise_temp(self,tdates):
+        '''Produce a modified version of a given data series, with times of
+        observation at specified list of datetime points (tdates)'''
         import os
         import datetime as dt
         
@@ -484,6 +532,18 @@ class data_series:
         new_series.type = 'regular_temp'
 
         return new_series
+
+
+    def daily_estimate(self,day,month,year):
+        import datetime as dt
+        regular_logical = (self.label[-2:] == '_r')
+        estimate_date = dt.datetime(year,month,day,0,0)
+        if regular_logical:
+            data_point = self.data_list[estimate_date]
+        else:
+            data_point = self.estimate(estimate_date)
+
+        return data_point
 
 
     def full_month_estimates(self,month,year):

@@ -1,6 +1,7 @@
 def standard_ztemp_subj_obj_dic():
-    # Provides a standard set of rules for converting a series of z points to depth in the absence of labels
-    # by assuming measurements to be made at 10cm intervals and the 7th measurement to lie at zero.
+    '''Provides a standard set of rules for converting a series of z points 
+    to depth in the absence of labels by assuming measurements to be made at 
+    10cm intervals and the 7th measurement to lie at zero.'''
     
     return_value = {}
     for index in range(50):
@@ -9,7 +10,9 @@ def standard_ztemp_subj_obj_dic():
     return return_value
 
 class temp_series:
+    '''Class for storing IMB temperature data'''
     def __init__(self,buoy_name,file_ext_name,znames):
+        '''Defines a new empty temperature series class'''
         self.name = buoy_name
 	self.fen = file_ext_name
         self.znames=znames
@@ -17,6 +20,8 @@ class temp_series:
 	self.profile_set = {}
 	
     def read(self,full_file,key):
+        '''Reads IMB temperature data from a given file into the given
+           temperature series'''
         import csv
         import data_series as ds
 	
@@ -56,6 +61,10 @@ class temp_series:
 
 
     def mask(self):
+        '''Given a set of unmasked temperature data in tag profile_set, 
+           produces a new set of masked temperature data in tag mprofile_set, 
+           given the MDI value (always -999.) and information about corrupted
+           temperature data (loaded in the function temp_mask, see below)'''
         import numpy as np
         import numpy.ma as ma        
         defined_masks = temp_mask(self.name)
@@ -77,6 +86,9 @@ class temp_series:
 
     
     def classify(self):
+        '''Decide whether the elevation labels of the given temperature series 
+           object are 'objective' (elevation can be directly inferred) or 
+           'subjective' (elevation must be determined by some other means)'''
 	ttypes = [zname[1] for zname in self.znames]
         if ttypes.count('S')>0:
             return 'Subjective'
@@ -85,12 +97,16 @@ class temp_series:
         
     
     def dates(self):
+        '''Returns ordered list of datetime objects equal to the times of
+           observation of the IMB temperature profiles'''
         date_values = self.profile_set.keys()
 	date_values.sort()
         return date_values
 
 
     def values(self,position):
+        '''Returns list of temperature values at a given position (0=highest
+           position, 1=next highest etc), ordered by time of observation'''
         
 	if (position > len(self.znames)):
 	    print 'No data available for this position'
@@ -102,6 +118,9 @@ class temp_series:
 
 
     def mvalues(self,position):
+        '''Returns list of temperature mask values at a given position 
+          (0=highest position, 1=next highest etc), ordered by time of 
+          observation'''
         
 	if (position > len(self.znames)):
 	    print 'No data available for this position'
@@ -113,6 +132,9 @@ class temp_series:
 	
 	
     def zpoints(self):
+        '''Returns numpy array of elevation points at which temperature data
+           is taken. Fails if the temperature series is still 'subjective'
+           as this means there is insufficient metadata'''
         import numpy as np
 	if self.classify()=='Subjective':
             print 'Can\'t define zpoints as temperature levels are not all objectively labelled.'
@@ -124,11 +146,15 @@ class temp_series:
 	
 	
     def period(self):
+        '''Returns earliest and latest date for which temperature 
+           data is present'''
 	dates = self.dates()
         return (dates[0],dates[-1])
 	
 	
     def zshow(self,ddt,show=True,regularise=False,zint=None):
+        '''Produces a temperature profile plot for the specified datetime ddt
+           '''
         import matplotlib.pyplot as plt
         zpts = self.zpoints()
         
@@ -146,6 +172,10 @@ class temp_series:
                 zvals = self.profile_set[ddt]
 
         plt.plot(zvals,zpts)
+        plt.gca().set_xlabel('Temperature ($^{\circ}$C)')
+        plt.gca().set_ylabel('Depth (m)')
+        plt.gca().set_title('Buoy '+self.name+', '+ddt.strftime(\
+           '%H:%M %d %B %Y'))
 
         if zint:
             for zpt in zint:
@@ -156,6 +186,8 @@ class temp_series:
 
 
     def show(self,position,show=True,start_date = None, end_date = None,color = None, xlr=None, label=True, ylim = None):
+        '''Produces a timeseries plot of temperature for the specified 
+           z-position'''
         import numpy as np    
         import matplotlib.pyplot as plt
         import data_series as ds
@@ -181,6 +213,7 @@ class temp_series:
         period_plot = [start_date,end_date]
 	
 	axis = plt.gca()
+        axis.set_ylabel('Temperature ($^{\circ}$C)')
         ds.set_special_xaxis(axis,xlr=xlr,period_plot=period_plot,label=label)
         if show:
 	    plt.show()
@@ -252,7 +285,7 @@ class temp_series:
 	#use_values = use_values[::-1,:]
 	
 	use_date_numbers = [date.toordinal() for date in use_dates]
-        plt.contourf(use_date_numbers,points,use_values)
+        plt.contourf(use_date_numbers,points,use_values, extend = 'both')
 	axis = plt.gca()
 	period_plot = self.period()
 	ds.set_special_xaxis(axis,period_plot=period_plot)
@@ -280,7 +313,7 @@ class temp_series:
 	ddates = self.dates()
 	points = np.array([float(zname[2:]) for zname in self.znames]) / 100.
 	
-	# Strip out dates without any data otherwise the plot will look rubbish
+	# Strip out dates without any data otherwise the plot will look awful
 	dlogical = [sum(v2.mask[:,i]) < nz for (i,ddate) in enumerate(ddates)]
 	use_dates = [date for (i,date) in enumerate(ddates) if dlogical[i]]
 	use_indices = [i for (i,date) in enumerate(ddates) if dlogical[i]]
@@ -288,14 +321,15 @@ class temp_series:
 	#use_values = use_values[::-1,:]
 	
 	use_date_numbers = [date.toordinal() for date in use_dates]
-        clev = plt.contourf(use_date_numbers,points,use_values,cmap=cmap,levels=levels)
+        clev = plt.contourf(use_date_numbers,points,use_values,cmap=cmap,levels=levels, extend = 'both')
 	axis = plt.gca()
 	period_plot = self.period()
 	if special_xaxis:
             ds.set_special_xaxis(axis,period_plot=period_plot)
         axis.set_ylabel('Depth (m')
 	
-	plt.colorbar(clev)
+	cb = plt.colorbar(clev)
+        cb.ax.set_ylabel('Temperature ($^{\circ}$C)')
 	if show:
 	    plt.show()
 	    
