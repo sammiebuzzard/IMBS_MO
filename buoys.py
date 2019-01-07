@@ -1,8 +1,19 @@
-maindir = '/data/cr1/hadax/PhD/Buoys/'
+'''Defines the main buoy class, a structure for holding data from CRREL 
+ice mass balance buoys. Data is held in the tag .data, a dictionary of data
+series objects, and in the tag .temp, a temperature series object'''
+
+
+maindir = '/data/cr1/hadax/PhD/Buoys/' # This should be set to the main 
+                                       # directory where the IMB data is held.
+                                       # Subdirectories should have names 
+                                       # equal to the IMB labels, e.g. '1997D',
+                                       # '2012L', with all files for each IMB
+                                       # placed under its directory
 revision_number = 20107
 buoydir = maindir
 
 def buoylist(year=0):
+    '''Returns list of all IMB labels'''
     import subprocess
     import data_series as ds
 
@@ -20,6 +31,7 @@ def buoylist(year=0):
     
 	
 def filelist(name):
+    '''Returns list of all files associated with a given IMB'''
     import subprocess
     fulldir = buoydir + name + '/'
     command = ['ls',fulldir]
@@ -43,6 +55,7 @@ def dt_number(datetime):
 
 class buoy:
     def __init__(self,name):
+        '''Creates a new empty buoy object'''
         self.name = name
         self.data = {}
         self.temp = None
@@ -50,6 +63,7 @@ class buoy:
 
 
     def buoy_file(self,varname):
+        '''Identifies the file containing a given variable for a buoy'''
 	import dictionaries
 	fd = dictionaries.file_dic()
 
@@ -62,6 +76,8 @@ class buoy:
 
 
     def find_file_ext_name(self,varname):
+        '''Isolates the file extension name for the file containing variable
+        varname for the given buoy, e.g. Temp, L3, clean'''
         use_file = self.buoy_file(varname)
         if use_file is None: return None
 	file_ext_name = file_split(use_file)[1]
@@ -69,6 +85,7 @@ class buoy:
     
     
     def extract_temp(self):
+        '''Reads temperature data for a given buoy into the tag temp'''
     
         import linekey
 	import dictionaries
@@ -94,6 +111,8 @@ class buoy:
 	
     
     def extract_data(self,varname,depth_marker=1):
+        '''Reads data from variable varname into the data dictionary for the 
+           given buoy. The data is stored as a data series object'''
         import numpy as np
 	import dictionaries
         import data_series as ds
@@ -146,6 +165,7 @@ class buoy:
 	
 	
     def map_track(self,mmap = False,show=True,axis=False,start_date=None,end_date=None,color=None,endpoints=True,legend=True):
+        '''Produces a map of the track of a given buoy'''
         import datetime as dt
         import matplotlib.pyplot as plt
         from mpl_toolkits.basemap import Basemap
@@ -203,6 +223,8 @@ class buoy:
               xlr = None, end_date = None, label=True,marker='+',\
               ylim = None, legend = True, colors = None, \
               legend_pos = [.1,.1,.8,.4]):
+        '''Produces a timeseries plot of a list of data series variables 
+           in a given buoy's .data tag (all on the same axes)'''
         import matplotlib.pyplot as plt
         import data_series as ds
         import numpy as np
@@ -265,6 +287,13 @@ class buoy:
 
 
     def interface_from_surface(self):
+        '''Calculates a likely snow-ice interface timeseries from the surface
+           timeseries of a given buoy, assuming that the interface is 
+           initially at elevation 0m, and remains constant until the surface
+           elevation falls below its level, whereupon it decreases with the
+           surface until the surface elevation begins to rise again.
+           This method would fail in the presence of snow-ice
+           formation.'''
         import datetime as dt
         import numpy as np
         import os
@@ -308,6 +337,8 @@ class buoy:
 
 
     def surface_from_interface_and_snow(self):
+        '''Calculates surface timeseries from timeseries of snow depth and
+           snow-ice interface.'''
         import datetime as dt
         import numpy as np
         import os
@@ -401,6 +432,13 @@ class buoy:
         
 
     def all_pos_r(self,temp=True):
+        '''The buoy elevation 'standardisation' method.
+           Calculates regular timeseries of ice base elevation, ice thickness,
+           snow-ice interface, snow depth and snow surface from all available 
+           data, deducing as far as possible timeseries for which no data is 
+           available from those for which there is data.
+           If keyword 'temp' is set, additional timeseries are calculated
+           with times-of-observation equal to those of the temperature data.'''
         import temp_series as tss
 
         if temp:
@@ -439,6 +477,8 @@ class buoy:
         
 
     def snowpos_rt(self,ddatetime):
+        '''Returns elevation of the top and base of the snow layer for a given
+           datetime which is a time-of-observation of temperature'''
 
         try:
             sseries = self.data['surface_rt']
@@ -470,6 +510,8 @@ class buoy:
         
 
     def icepos_rt(self,ddatetime):
+        '''Returns elevation of the top and base of the ice layer for a given
+           datetime which is a time-of-observation of temperature'''
 
         try:
             bseries = self.data['bottom_rt']
@@ -500,7 +542,93 @@ class buoy:
         return [bpos,ipos]
 
 
+    def average_snow_temp(self,restrict_hour=None):
+        '''Returns data series of the average temperature of the snow layer,
+           with times-of-observation equal to those of the temperature'''
+        import tprof
+        import data_series as ds
+        import numpy as np
+        tdates = self.temp.dates()
+        varname = 'average_snow_temp'
+        self.data[varname] = ds.data_series(self.name,'',varname)
+        if not 'surface_rt' in self.data.keys() and \
+           not 'interface_rt' in self.data.keys():
+            print 'Not enough information provided'
+            return self.data[varname]
+
+        if self.data['surface_rt'].period() is None or \
+           self.data['interface_rt'].period() is None:
+            return self.data[varname]
+
+        for tdate in tdates:
+            if restrict_hour is None or tdate.hour == restrict_hour:
+                if tdate >= max([self.data['surface_rt'].period()[0],\
+                                 self.data['interface_rt'].period()[0]]) and \
+                   tdate <= min([self.data['surface_rt'].period()[1],\
+                                 self.data['interface_rt'].period()[1]]):
+                    zint = [self.data['surface_rt'].data_list[tdate],\
+                            self.data['interface_rt'].data_list[tdate]]
+
+                    zprof = tprof.complete_zprof(self,tdate,zint)
+                    if zprof is not None:
+                        weights = tprof.zpt_weights(zprof[0])
+                        mean_temp = np.sum(zprof[1] * weights) / np.sum(weights)
+                        self.data[varname].data_list[tdate] = mean_temp
+
+        self.data[varname].type = 'regular'
+        return self.data[varname]
+
+
+    def average_ice_temp(self,layer=1,nlayer=4,restrict_hour = None):
+        '''Returns data series of the average temperature of given sections of 
+          the ice layer, with times-of-observation equal to those of the 
+          temperature.
+          e.g. layer=1, nlayer=1 returns the average temp of the whole ice layer
+               layer=1, nlayer=4 returns the average temp of the top 
+               quarter of the ice layer
+               layer=4, nlayer=4 returns the average temp of the bottom quarter
+               of the ice layer'''
+        import tprof
+        import data_series as ds
+        import numpy as np
+        tdates = self.temp.dates()
+        varname = 'average_ice_temp.ilayer.'+str(layer)+'.nlayer.'+str(nlayer)
+        self.data[varname] = ds.data_series(self.name,'',varname)
+        if not 'bottom_rt' in self.data.keys() and \
+           not 'interface_rt' in self.data.keys():
+            print 'Not enough information provided'
+            return self.data[varname]
+
+        if self.data['bottom_rt'].period() is None or \
+           self.data['interface_rt'].period() is None:
+            return self.data[varname]
+
+        for tdate in tdates:
+            if restrict_hour is None or tdate.hour == restrict_hour:
+                if tdate >= max([self.data['bottom_rt'].period()[0],\
+                                 self.data['interface_rt'].period()[0]]) and \
+                   tdate <= min([self.data['bottom_rt'].period()[1],\
+                                 self.data['interface_rt'].period()[1]]):
+                    zint_f = np.array([self.data['interface_rt'].data_list[tdate],\
+                            self.data['bottom_rt'].data_list[tdate]])
+                    prop_start = float(layer-1) / float(nlayer)
+                    prop_end = float(layer) / float(nlayer)
+                    zint = [zint_f[0] + prop_start * (zint_f[1] - zint_f[0]),\
+                            zint_f[0] + prop_end * (zint_f[1] - zint_f[0])]
+
+                    zprof = tprof.complete_zprof(self,tdate,zint)
+                    if zprof is not None:
+                        weights = tprof.zpt_weights(zprof[0])
+                        mean_temp = np.sum(zprof[1] * weights) / np.sum(weights)
+                        self.data[varname].data_list[tdate] = mean_temp
+
+        self.data[varname].type = 'regular'
+        return self.data[varname]
+
+
     def new_sfc_temp_series(self,distance_from_sfc):
+        '''Calculates a new data series of estimated temperature of an elevation
+           which remains a constant distance from the top snow surface'''
         import data_series as ds
         import tprof
 
@@ -520,6 +648,8 @@ class buoy:
 
 
     def new_basal_temp_series(self,distance_from_base):
+        '''Calculates a new data series of estimated temperature of an elevation
+           which remains a constant distance from the ice base'''
         import data_series as ds
         import tprof
 
@@ -539,6 +669,8 @@ class buoy:
 
 
     def is_series(self,name):
+        '''Returns True if a given data series has been saved to the main
+           data directory.'''
         import os
         datadir = '/data/cr1/hadax/PhD/Buoys/'+self.name+'/'
         datafile = datadir + name + '.dat'
@@ -546,11 +678,14 @@ class buoy:
 
 
     def save_series(self):
+        '''Saves all data series to the main data directory'''
         for series_name in self.data.keys():
             self.data[series_name].file_write()
 
 
     def update_series(self):
+        '''Loads all data series saved in the main data directory to the .data
+           tag of the given buoy'''
         import glob
         import data_series as ds
         datadir = buoydir+self.name+'/'
@@ -564,6 +699,8 @@ class buoy:
             
     
     def process_temp(self):
+        '''Reads and provides an initial 'clean' of ice and snow temperature
+           data.'''
         import temp_series as tss
         self.extract_temp()
         if self.temp.classify()=='Subjective':
