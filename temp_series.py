@@ -6,56 +6,83 @@ def standard_ztemp_subj_obj_dic():
     return_value = {}
     for index in range(50):
         return_value[index] = 60. - float(index)*10.
-	
+        
     return return_value
+
+
+def read_ztemp_subj_obj_dic(in_file=None,buoy_name=None):
+    '''Reads a dictionary of temperature elevation labels from a file'''
+
+    if buoy_name is None:
+        print('Please provide name of buoy')
+        raise ValueError
+
+    fileh = open(in_file)
+    lines = fileh.readlines()
+    elevations = {line.split(',')[0].strip(): \
+                    float(line.split(',')[1].strip()) \
+                    for line in lines}
+    try:
+        this_elevation = elevations[buoy_name]
+    except KeyError:
+        print('No temp point elevation data for buoy '+buoy_name)
+        raise ValueError
+
+    return_value = {}
+    for index in range(50):
+        return_value[index] = this_elevation - float(index)*10.
+    
+    return return_value
+
 
 class temp_series:
     '''Class for storing IMB temperature data'''
     def __init__(self,buoy_name,file_ext_name,znames):
         '''Defines a new empty temperature series class'''
         self.name = buoy_name
-	self.fen = file_ext_name
+        self.fen = file_ext_name
         self.znames=znames
-	self.mdi = -999.
-	self.profile_set = {}
-	
+        self.mdi = -999.
+        self.profile_set = {}
+        
     def read(self,full_file,key):
         '''Reads IMB temperature data from a given file into the given
            temperature series'''
         import csv
         import data_series as ds
-	
-	max_zlist = len(key.value_index)		
+        import functions
+        
+        max_zlist = len(key.value_index)                
             
-	fileh = open(full_file)
+        fileh = open(full_file)
         rows = csv.reader(fileh)
         for row in rows:
-	    if len(row)>0:
-	        date_string = row[key.date_index]
-		date = ds.process_dates(date_string,self.name,self.fen)
-		
-		if date != 0:
-		
-		    temp_list = []
-		    for index in key.value_index:
+            if len(row)>0:
+                date_string = row[key.date_index]
+                date = ds.process_dates(date_string,self.name,self.fen)
+                
+                if date is not None:
+                
+                    temp_list = []
+                    for index in key.value_index:
                         if index >= len(row):
                             temp_value = self.mdi
                         else:
-			    temp_string = row[index]
-			    if len(temp_string) != 0 and \
-                                 ds.is_number(temp_string):
-			        temp_value = float(temp_string)
-			    else:
-			        temp_value = self.mdi
-			
-			temp_list.append(temp_value)
-			
-	            if len(temp_list) != max_zlist:
-		        print 'Number of temp instances does not match key for date ', date
-		        return 0
-			
-	            if temp_list.count(self.mdi) != len(temp_list):
-		        self.profile_set[date] = temp_list
+                            temp_string = row[index]
+                            if len(temp_string) != 0 and \
+                                 functions.is_number(temp_string):
+                                temp_value = float(temp_string)
+                            else:
+                                temp_value = self.mdi
+                        
+                        temp_list.append(temp_value)
+                        
+                    if len(temp_list) != max_zlist:
+                        print('Number of temp instances does not match key for date ', date)
+                        return 0
+                        
+                    if temp_list.count(self.mdi) != len(temp_list):
+                        self.profile_set[date] = temp_list
 
         fileh.close()
 
@@ -89,18 +116,18 @@ class temp_series:
         '''Decide whether the elevation labels of the given temperature series 
            object are 'objective' (elevation can be directly inferred) or 
            'subjective' (elevation must be determined by some other means)'''
-	ttypes = [zname[1] for zname in self.znames]
+        ttypes = [zname[1] for zname in self.znames]
         if ttypes.count('S')>0:
             return 'Subjective'
-	else:
-	    return 'Objective'
+        else:
+            return 'Objective'
         
     
     def dates(self):
         '''Returns ordered list of datetime objects equal to the times of
            observation of the IMB temperature profiles'''
-        date_values = self.profile_set.keys()
-	date_values.sort()
+        date_values = list(self.profile_set.keys())
+        date_values.sort()
         return date_values
 
 
@@ -108,13 +135,13 @@ class temp_series:
         '''Returns list of temperature values at a given position (0=highest
            position, 1=next highest etc), ordered by time of observation'''
         
-	if (position > len(self.znames)):
-	    print 'No data available for this position'
-	    return 0
-	
-	ddates = self.dates()
-	vvalues = [self.profile_set[date][position] for date in ddates]
-	return vvalues
+        if (position > len(self.znames)):
+            print('No data available for this position')
+            return 0
+        
+        ddates = self.dates()
+        vvalues = [self.profile_set[date][position] for date in ddates]
+        return vvalues
 
 
     def mvalues(self,position):
@@ -122,56 +149,56 @@ class temp_series:
           (0=highest position, 1=next highest etc), ordered by time of 
           observation'''
         
-	if (position > len(self.znames)):
-	    print 'No data available for this position'
-	    return 0
-	
-	ddates = self.dates()
-	maskvalues = [self.mprofile_set[date].mask[position] for date in ddates]
-	return maskvalues
-	
-	
+        if (position > len(self.znames)):
+            print('No data available for this position')
+            return 0
+        
+        ddates = self.dates()
+        maskvalues = [self.mprofile_set[date].mask[position] for date in ddates]
+        return maskvalues
+        
+        
     def zpoints(self):
         '''Returns numpy array of elevation points at which temperature data
            is taken. Fails if the temperature series is still 'subjective'
            as this means there is insufficient metadata'''
         import numpy as np
-	if self.classify()=='Subjective':
-            print 'Can\'t define zpoints as temperature levels are not all objectively labelled.'
-	    return 0
-	    
-	points = np.array([float(zname[2:]) for zname in self.znames]) / 100.
-	
-	return points
-	
-	
+        if self.classify()=='Subjective':
+            print('Can\'t define zpoints as temperature levels are not all objectively labelled.')
+            return 0
+            
+        points = np.array([float(zname[2:]) for zname in self.znames]) / 100.
+        
+        return points
+        
+        
     def period(self):
         '''Returns earliest and latest date for which temperature 
            data is present'''
-	dates = self.dates()
+        dates = self.dates()
         return (dates[0],dates[-1])
-	
-	
-    def zshow(self,ddt,show=True,regularise=False,zint=None):
+        
+        
+    def zshow(self,ddt,show=True,regularise=False,zint=None,label=None):
         '''Produces a temperature profile plot for the specified datetime ddt
            '''
         import matplotlib.pyplot as plt
         zpts = self.zpoints()
         
         if not check_period(ddt,self.period()):
-            print 'Requested datetime is not within the period for this data'
+            print('Requested datetime is not within the period for this data')
             return None
 
         if regularise:
             zvals = self.estimate(ddt)
         else:
             if ddt not in self.dates():
-                print 'Data is not available for this datetime'
+                print('Data is not available for this datetime')
                 return None
             else:
                 zvals = self.profile_set[ddt]
 
-        plt.plot(zvals,zpts)
+        plt.plot(zvals,zpts,label=label)
         plt.gca().set_xlabel('Temperature ($^{\circ}$C)')
         plt.gca().set_ylabel('Depth (m)')
         plt.gca().set_title('Buoy '+self.name+', '+ddt.strftime(\
@@ -191,169 +218,195 @@ class temp_series:
         import numpy as np    
         import matplotlib.pyplot as plt
         import data_series as ds
-	
+        
         ddates = self.dates()
-	vvalues = self.values(position)
+        vvalues = self.values(position)
         maskvalues = self.mvalues(position)
-	
-	vthere = [(date,value,mask) for (date,value,mask) in zip(ddates,vvalues,maskvalues) if value != self.mdi]
-	unzip_vthere = (np.array([date for (date,value,mask) in vthere]),\
+        
+        vthere = [(date,value,mask) for (date,value,mask) in zip(ddates,vvalues,maskvalues) if value != self.mdi]
+        unzip_vthere = (np.array([date for (date,value,mask) in vthere]),\
                         np.array([value for (date,value,mask) in vthere]),\
                         np.array([mask for (data,value,mask) in vthere]))
 
         show_index = np.where(1-unzip_vthere[2])
-	plt.plot(unzip_vthere[0][show_index],unzip_vthere[1][show_index])
+        plt.plot(unzip_vthere[0][show_index],unzip_vthere[1][show_index])
 
         period = self.period()
-	if not start_date:
-	    start_date = period[0]
-	if not end_date:
-	    end_date = period[1]
-	    
+        if not start_date:
+            start_date = period[0]
+        if not end_date:
+            end_date = period[1]
+            
         period_plot = [start_date,end_date]
-	
-	axis = plt.gca()
+        
+        axis = plt.gca()
         axis.set_ylabel('Temperature ($^{\circ}$C)')
         ds.set_special_xaxis(axis,xlr=xlr,period_plot=period_plot,label=label)
         if show:
-	    plt.show()
+            plt.show()
 
 
     def below_surface(self,sfc,date):
     
         if self.classify()=='Subjective':
-	    print 'Cannot carry out this operation for subjectively labelled zpoints'
-	    return 0
-	            
+            print('Cannot carry out this operation for subjectively labelled zpoints')
+            return 0
+                    
         value = sfc.estimate(date)
-	return [value >= zpt for zpt in self.zpoints()]
-	
+        return [value >= zpt for zpt in self.zpoints()]
+        
 
     def above_bottom(self,bot,date):
     
         if self.classify()=='Subjective':
-	    print 'Cannot carry out this operation for subjectively labelled zpoints'
-	    return 0
-	            
+            print('Cannot carry out this operation for subjectively labelled zpoints')
+            return 0
+                    
         value = bot.estimate(date)
-	return [value <= zpt for zpt in self.zpoints()]
-	
+        return [value <= zpt for zpt in self.zpoints()]
+        
 
     def values_2D(self):
         import numpy as np
-	import numpy.ma as ma
+        import numpy.ma as ma
         
-	ddates = self.dates()
-	nt = len(ddates)
-	nz = len(self.znames)
-	
-	return_temp_array = np.zeros((nz,nt))
-	return_temp_array_ma = ma.masked_array(return_temp_array,mask=(return_temp_array==self.mdi))
-	
-	for (i,date) in enumerate(ddates):
-	    values = np.array(self.profile_set[date])
-	    
-	    return_temp_array[:,i] = values
-	    
-	return_temp_array_ma = ma.masked_array(return_temp_array,mask=(return_temp_array==self.mdi))
-	
-	return return_temp_array_ma
+        ddates = self.dates()
+        nt = len(ddates)
+        nz = len(self.znames)
+        
+        return_temp_array = np.zeros((nz,nt))
+        return_temp_array_ma = ma.masked_array(return_temp_array,mask=(return_temp_array==self.mdi))
+        
+        for (i,date) in enumerate(ddates):
+            values = np.array(self.profile_set[date])
+            
+            return_temp_array[:,i] = values
+            
+        return_temp_array_ma = ma.masked_array(return_temp_array,mask=(return_temp_array==self.mdi))
+        
+        return return_temp_array_ma
+        
+
+    def values_2D_masked(self):
+        import numpy as np
+        import numpy.ma as ma
+        
+        ddates = self.dates()
+        nt = len(ddates)
+        nz = len(self.znames)
+        
+        return_temp_array = ma.masked_array(np.zeros((nz,nt)),mask=np.zeros((nz,nt),dtype='bool'))
+        
+        for (i,date) in enumerate(ddates):
+            values = np.array(self.mprofile_set[date])
+            
+            return_temp_array[:,i] = values
+            
+        index = np.where(return_temp_array.mask == True)
+        return_temp_array.mask[index] = True
+        return return_temp_array
 
 
     def contour_subj(self,show=True):
         import matplotlib.pyplot as plt
-	import numpy as np
+        import numpy as np
         import data_series as ds
-	
-	nz = len(self.znames)
         
-	ttypes = [zname[1] for zname in self.znames]
-	subj = [ttype=='S' for ttype in ttypes]
+        nz = len(self.znames)
+        
+        ttypes = [zname[1] for zname in self.znames]
+        subj = [ttype=='S' for ttype in ttypes]
         if subj.count(False)>0:
-	    print 'Note that not all temperature levels are subjectively labelled'
-	    
-	v2 = self.values_2D()
-	ddates = self.dates()
-	points = np.array([int(zname[2:]) for zname in self.znames])
-	points = 0 - points
-	
-	# Strip out dates without any data otherwise the plot will look rubbish
-	dlogical = [sum(v2.mask[:,i]) < nz for (i,ddate) in enumerate(ddates)]
-	use_dates = [date for (i,date) in enumerate(ddates) if dlogical[i]]
-	use_indices = [i for (i,date) in enumerate(ddates) if dlogical[i]]
-	use_values = v2[:,use_indices]
-	#use_values = use_values[::-1,:]
-	
-	use_date_numbers = [date.toordinal() for date in use_dates]
-        plt.contourf(use_date_numbers,points,use_values, extend = 'both')
-	axis = plt.gca()
-	period_plot = self.period()
-	ds.set_special_xaxis(axis,period_plot=period_plot)
-	
-	if show:
-	    plt.show()
-	    
-
-    def contour_obj(self,show=True,levels=None,special_xaxis=True):
-        import matplotlib.pyplot as plt
-	import numpy as np
-	import monty
-        import data_series as ds
-        cmap = monty.clr_cmap('/home/h01/hadax/IDL/colour_tables/temps.clr')
-
-	nz = len(self.znames)
+            print('Note that not all temperature levels are subjectively labelled')
+            
+        v2 = self.values_2D()
+        ddates = self.dates()
+        points = np.array([int(zname[2:]) for zname in self.znames])
+        points = 0 - points
         
-	ttypes = [zname[1] for zname in self.znames]
-	obj = [ttype=='O' for ttype in ttypes]
-        if obj.count(False)>0:
-	    print 'Error: not all temperature levels are objectively labelled'
-	    return 0
-	    
-	v2 = self.values_2D()
-	ddates = self.dates()
-	points = np.array([float(zname[2:]) for zname in self.znames]) / 100.
-	
-	# Strip out dates without any data otherwise the plot will look awful
-	dlogical = [sum(v2.mask[:,i]) < nz for (i,ddate) in enumerate(ddates)]
-	use_dates = [date for (i,date) in enumerate(ddates) if dlogical[i]]
-	use_indices = [i for (i,date) in enumerate(ddates) if dlogical[i]]
-	use_values = v2[:,use_indices]
-	#use_values = use_values[::-1,:]
-	
-	use_date_numbers = [date.toordinal() for date in use_dates]
-        clev = plt.contourf(use_date_numbers,points,use_values,cmap=cmap,levels=levels, extend = 'both')
-	axis = plt.gca()
-	period_plot = self.period()
-	if special_xaxis:
-            ds.set_special_xaxis(axis,period_plot=period_plot)
-        axis.set_ylabel('Depth (m')
-	
-	cb = plt.colorbar(clev)
-        cb.ax.set_ylabel('Temperature ($^{\circ}$C)')
-	if show:
-	    plt.show()
-	    
-        return plt.gcf()
+        # Strip out dates without any data otherwise the plot will look rubbish
+        dlogical = [sum(v2.mask[:,i]) < nz for (i,ddate) in enumerate(ddates)]
+        use_dates = [date for (i,date) in enumerate(ddates) if dlogical[i]]
+        use_indices = [i for (i,date) in enumerate(ddates) if dlogical[i]]
+        use_values = v2[:,use_indices]
+        #use_values = use_values[::-1,:]
+        
+        use_date_numbers = [date.toordinal() for date in use_dates]
+        plt.contourf(use_date_numbers,points,use_values, extend = 'both')
+        axis = plt.gca()
+        period_plot = self.period()
+        ds.set_special_xaxis(axis,period_plot=period_plot)
+        
+        if show:
+            plt.show()
+            
 
-	    
+    def contour_obj(self,show=True,levels=None,special_xaxis=True,
+                    figure=None,axis=None):
+        import matplotlib.pyplot as plt
+        import numpy as np
+        import data_series as ds
+        cmap = plt.get_cmap('coolwarm')
+
+        nz = len(self.znames)
+        
+        ttypes = [zname[1] for zname in self.znames]
+        obj = [ttype=='O' for ttype in ttypes]
+        if obj.count(False)>0:
+            print('Error: not all temperature levels are objectively labelled')
+            return 0
+            
+        v2 = self.values_2D()
+        ddates = self.dates()
+        points = np.array([float(zname[2:]) for zname in self.znames]) / 100.
+        
+        # Strip out dates without any data otherwise the plot will look awful
+        dlogical = [sum(v2.mask[:,i]) < nz for (i,ddate) in enumerate(ddates)]
+        use_dates = [date for (i,date) in enumerate(ddates) if dlogical[i]]
+        use_indices = [i for (i,date) in enumerate(ddates) if dlogical[i]]
+        use_values = v2[:,use_indices]
+        #use_values = use_values[::-1,:]
+        
+        use_date_numbers = [date.toordinal() for date in use_dates]
+
+        if figure is None:
+            figure = plt.figure(figsize=(9,7))
+        
+        if axis is None:
+            axis = figure.add_axes([.1,.05,.85,.85])
+
+        clev = axis.contourf(use_date_numbers,points,use_values,cmap=cmap,levels=levels, extend = 'both')
+        period_plot = self.period()
+        if special_xaxis:
+            ds.set_special_xaxis(axis,period_plot=period_plot)
+        axis.set_ylabel('Depth (m)')
+        
+        cb = plt.colorbar(clev)
+        cb.ax.set_ylabel('Temperature ($^{\circ}$C)')
+        if show:
+            plt.show()
+            
+        return (figure,axis)
+
+            
     def subjective_to_objective(self,dictionary=None):
         nz = len(self.znames)
-	
-	new_znames = []
-	for zname in self.znames:
-	    if zname[1]=='S':
-	        number = int(zname[2:])
-            else:
-                print 'Error: this temp series appears to be at least'+\
-                      ' partially objective'
-                return None
-		
-	    objective_value = dictionary[number]
-	    new_znames.append('TO'+str(objective_value))
         
-	self.subj_znames = self.znames
-	self.znames = new_znames
-	
+        new_znames = []
+        for (ii,zname) in enumerate(self.znames):
+            if zname[1]=='S':
+                number = int(zname[2:])
+            else:
+                print('Error: this temp series appears to be at least'+\
+                      ' partially objective')
+                return None
+                
+            objective_value = dictionary[ii]
+            new_znames.append('TO'+str(objective_value))
+        
+        self.subj_znames = self.znames
+        self.znames = new_znames
+        
 
     def extract_series(self,zname):
         import data_series as ds
@@ -382,11 +435,11 @@ class temp_series:
         import numpy.ma as ma
 
         if not hasattr(self,'mprofile_set'):
-            print 'Temperature data must be masked to apply this method'
+            print('Temperature data must be masked to apply this method')
             return None
 
         if self.classify()=='Subjective':
-            print 'Temperature series must be objectively labelled to apply this method'
+            print('Temperature series must be objectively labelled to apply this method')
             return None
 
         tiny = 1.e-5
@@ -427,7 +480,7 @@ class temp_series:
                 mask_array = np.zeros(len(zpts),dtype='bool')
 
                 for (ii,zpt) in enumerate(zpts):
-                    zinds = ztrans_dic[zpt].keys()
+                    zinds = list(ztrans_dic[zpt].keys())
                     if len(zinds) == 0:
                         mask_array.itemset(ii,True)
                     else:
@@ -456,8 +509,9 @@ class temp_series:
     def translate(self):
         import datetime as dt
         import copy
+        import filepaths
 
-        tr_file = '/data/cr1/hadax/PhD/Buoys/temp_translations.txt'
+        tr_file = filepaths.filepaths()['temp_translations_file']
         fileh = open(tr_file)
         line = fileh.readline()
         while line.strip()[1:-1] != self.name and \
@@ -469,7 +523,7 @@ class temp_series:
         while line.strip() != '' and line != '':
             arguments = line.split(' ')
             if len(arguments) != 3:
-                print 'Cannot parse translation file for buoy '+self.name
+                print('Cannot parse translation file for buoy '+self.name)
                 return None
 
             try:
@@ -478,14 +532,14 @@ class temp_series:
                 enddate   = dt.datetime(*([int(item) for item in \
                                            arguments[1].split('-')]))
             except TypeError:
-                print 'Date arguments are in the wrong format for buoy '+self.name
+                print('Date arguments are in the wrong format for buoy '+self.name)
                 return None
 
             try:
                 translation = float(arguments[2])
             except ValueError:
-                print 'Translation argument is in the wrong format for buoy '+\
-                    self.name
+                print('Translation argument is in the wrong format for buoy '+\
+                    self.name)
 
             use_series = use_series.apply_translation([startdate,enddate],\
                                        translation)
@@ -512,7 +566,9 @@ class single_temp_mask:
 
 def temp_mask(buoy_name):
     import datetime as dt
-    mask_file = 'temp_mask.txt'
+    import sys
+    import filepaths
+    mask_file = filepaths.filepaths()['temp_masks_file']
     fileh = open(mask_file)
 
     found_buoy = False
@@ -521,8 +577,9 @@ def temp_mask(buoy_name):
         if len(line) >= 6:
             found_buoy = line[1:6] == buoy_name
 
+
     if not found_buoy:
-        print 'No reference to this buoy in mask file'
+        print('No reference to this buoy in mask file')
         return None
 
     reading_entries = True
@@ -531,7 +588,6 @@ def temp_mask(buoy_name):
         line = fileh.readline()
         if line.rstrip():
             elements = line.rstrip().split(' ')
-            print elements
             if len(elements) < 4:
                 reading_entries = False
                 break
@@ -545,8 +601,8 @@ def temp_mask(buoy_name):
                 start_zint = int(elements[2])
                 end_zint = int(elements[3])
             except ValueError:
-                print 'Incorrect format of date:'
-                print line
+                print('Incorrect format of date:')
+                print(line)
                 return 0
 
             period = [dt.datetime(*start_date_elts),dt.datetime(*end_date_elts)]

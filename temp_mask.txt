@@ -41,6 +41,7 @@
 [2004B]
 
 [2004C]
+2004-06-17-00-00 2004-12-08-16-00 30 42 # Temperatures are unrealistically high
 
 [2004D]
 
@@ -149,6 +150,8 @@
 [2012B]
 
 [2012C]
+2012-04-17-16-00 2012-10-24-14-00 8 9 # Temperatures in this layer are far too high
+2012-04-17-16-00 2012-10-24-14-00 15 16 # Temperatures in this layer are far too high
 
 [2012D]
 
@@ -206,10 +209,9 @@
 [2015B]
 2015-03-25-21-00 2015-04-08-00-00 0 31 # During this period, the temperature profile appears to be strongly influenced by deployment, being initially isothermal and then rapidly cooling
 
-[2015C]
-
 [2015D]
 2015-11-22-12-00 2016-01-28-12-00 10 15 # Temperature data contains many obviously wrong values
+
 
 [2015E]
 

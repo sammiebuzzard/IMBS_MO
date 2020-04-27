@@ -2,20 +2,13 @@
 to determine and store information about data format in a CRREL 
 ice mass balance buoy.'''
 
-def is_number(string):
-    try:
-        float(string)
-	return True
-    except ValueError:
-        return False
-	
 class linekey:
     def __init__(self,date_index = 0):
-	self.date_index = date_index
-	self.value_index = []
-	self.phenomena_names = []
-	self.lon_flip_ew = (False,-1,-1)
-	self.lat_flip_ns = (False,-1,-1)
+        self.date_index = date_index
+        self.value_index = []
+        self.phenomena_names = []
+        self.lon_flip_ew = (False,-1,-1)
+        self.lat_flip_ns = (False,-1,-1)
         self.vertical_scale = 1.
         self.fliplon = False
 
@@ -28,63 +21,63 @@ class linekey:
 
     def ew(self,index_flippee,index_flipper):
         self.lon_flip_ew = (True,index_flippee,index_flipper)
-	
-	
+        
+        
 def get_temp_linekey(data_file):
+    import csv
     fileh = open(data_file)
     
-    import csv
     rows = csv.reader(fileh)
     found_key = False
     found_date = False
     
     for row in rows:
+        print(row)
 
-	for (i,strtest) in enumerate(row):
-    	    if ('Date' in strtest) or ('DATE' in strtest):
-		key = linekey(date_index = i)
-		found_date = True			
-		break
+        for (i,strtest) in enumerate(row):
+            if ('Date' in strtest) or ('DATE' in strtest):
+                key = linekey(date_index = i)
+                found_date = True                       
+                break
 
         if found_date:
-	    
-	    temp_codes = {}
-	    
-	    temp_type = ''
-	    for (i,strtest) in enumerate(row):
-	        result = classify_temp_header(strtest)
-		
-		if result[0]==1:
-		    if temp_type == 'subjective':
-		        print 'Unable to determine temperature type'
-			return 0
-		    temp_type = 'objective'
-		    prefix = 'TO'
-		    
-		if result[0]==2:
-		    if temp_type == 'objective':
-		        print 'Unable to determine temperature type'
-			return 0
-		    temp_type = 'subjective'
-		    prefix = 'TS'
-		    
-	        temp_codes[i] = classify_temp_header(strtest)
+            
+            temp_codes = {}
+            
+            temp_type = ''
+            for (i,strtest) in enumerate(row):
+                result = classify_temp_header(strtest)
+                
+                if result[0]==1:
+                    if temp_type == 'subjective':
+                        print('Unable to determine temperature type')
+                        return None
+                    temp_type = 'objective'
+                    prefix = 'TO'
+                    
+                if result[0]==2:
+                    if temp_type == 'objective':
+                        print('Unable to determine temperature type')
+                        return None
+                    temp_type = 'subjective'
+                    prefix = 'TS'
+                    
+                temp_codes[i] = classify_temp_header(strtest)
 
                 if result[0]!=0:
-		    key.add_value_index(prefix+str(result[1]),i)
-		  
-	    break
-	    
-    	      
+                    key.add_value_index(prefix+str(result[1]),i)
+                  
+            break
+            
+              
     return key
     
 
 def get_linekey(data_file,variable_list,buoy_name):
-
-    fileh = open(data_file)
-
     import dictionaries
     import csv
+
+    fileh = open(data_file)
     rows = csv.reader(fileh)
     found_key = False
     found_date = False
@@ -95,24 +88,24 @@ def get_linekey(data_file,variable_list,buoy_name):
     fliplon = False   
 
     for row in rows:
-	if not found_key:
+        if not found_key:
 
-	    for (i,strtest) in enumerate(row):
-    		if ('Date' in strtest) or ('DATE' in strtest):
-		    key = linekey(date_index = i)
-		    found_date = True			
-		    break
+            for (i,strtest) in enumerate(row):
+                if ('Date' in strtest) or ('DATE' in strtest):
+                    key = linekey(date_index = i)
+                    found_date = True                   
+                    break
 
-	    if found_date:
+            if found_date:
 
                 for (varno,variable_keys) in enumerate(variable_keys_list):
-		    found_key = False
+                    found_key = False
                     for string in variable_keys:
-			for (i,strtest) in enumerate(row):
-			    if (string == strtest.strip()):
-				key.add_value_index(variable_list[varno],i)
-				found_key = True
-				i_key = i
+                        for (i,strtest) in enumerate(row):
+                            if (string == strtest.strip()):
+                                key.add_value_index(variable_list[varno],i)
+                                found_key = True
+                                i_key = i
 
                                 if '(cm)' in string:
                                     vertical_scale = 0.01
@@ -123,17 +116,17 @@ def get_linekey(data_file,variable_list,buoy_name):
                                     fliplon = True
 
                     if not found_key:
-		        key.add_value_index(variable_list[varno],-1)
+                        key.add_value_index(variable_list[varno],-1)
 
-		    if variable_list[varno]=='latitude':
-			for (i,strtest) in enumerate(row):
-			    if (strtest == 'N/S'):
-		        	key.ns(i_key,i)
+                    if variable_list[varno]=='latitude':
+                        for (i,strtest) in enumerate(row):
+                            if (strtest == 'N/S'):
+                                key.ns(i_key,i)
 
-		    if variable_list[varno]=='longitude':
-			for (i,strtest) in enumerate(row):
-			    if (strtest == 'E/W'):
-		        	key.ew(i_key,i)
+                    if variable_list[varno]=='longitude':
+                        for (i,strtest) in enumerate(row):
+                            if (strtest == 'E/W'):
+                                key.ew(i_key,i)
 
         if True in [('units are cm') in item for item in row]:
             vertical_scale = 0.01
@@ -150,36 +143,37 @@ def get_linekey(data_file,variable_list,buoy_name):
             
 
     if not found_date:
-	print 'Could not find date'
-	fileh.close()
-	return 0	
-		
+        print('Could not find date')
+        fileh.close()
+        return None  
+                
     key.vertical_scale = vertical_scale
     key.fliplon = fliplon
     fileh.close()
     return key
 
 def classify_temp_header(string):
-    if is_number(string):
+    import functions
+    if functions.is_number(string):
         number = float(string)
         return (1,number)
     
-    elif string[0:1]=='T' and string[-3:]=='(C)' and is_number(string[1:-3]):
+    elif string[0:1]=='T' and string[-3:]=='(C)' and functions.is_number(string[1:-3]):
         number = int(string[1:-3])
         return (2,number)
 
-    elif string[0:1]=='T' and is_number(string[1:]):
+    elif string[0:1]=='T' and functions.is_number(string[1:]):
         number = int(string[1:])
         return (2,number)
 
     elif len(string) >= 4:
-        if string[0:4]=='TEMP' and is_number(string[4:]):
+        if string[0:4]=='TEMP' and functions.is_number(string[4:]):
             number = int(string[4:])
             return (2,number)
-        elif string[0:5]=='Temp ' and is_number(string[5:]):
+        elif string[0:5]=='Temp ' and functions.is_number(string[5:]):
             number = int(string[5:])
             return (2,number) 
-	else:
+        else:
             return (0,0)
     else:
         return (0,0)
