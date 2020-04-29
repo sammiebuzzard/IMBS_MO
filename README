@@ -1,0 +1,10 @@
+This code allows reading, basic quality control, processing to consistent data series on consistent time points, and writing to netCDF4 format, of the Arctic Ice Mass Balance Buoy data archived at CRREL.
+
+The driver routine is buoys_run.py.
+
+Users should edit the entries in filepaths.py to set locations of input data, output data and the various auxiliary files contained in the code:
+
+   - mday_flag.txt: list of buoys whose dates are in British and not American format
+   - ztemp_dic.txt: elevation of top temperature measurement point for each buoy (if not given, assumed to be 60cm)
+   - elevation_translations.txt: buoys with parts of elevation series likely to be in error by a fixed displacement
+   - temp_translations.txt: buoys with parts of temperature series likely to be in error by a fixed displacement
